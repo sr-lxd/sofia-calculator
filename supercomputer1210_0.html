@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>超级计算机</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/9.5.1/math.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .calculator {
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            padding: 10px;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 400px;
+        }
+        .calculator textarea {
+            width: 100%;
+            padding: 20px;
+            margin-bottom: 10px;
+            font-size: 18px;
+            text-align: right;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            height: 100px;
+            box-sizing: border-box;
+            resize: none;
+            overflow-x: auto;
+        }
+        .button-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .calculator button {
+            flex: 1;
+            padding: 10px;
+            margin: 3px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            background-color: #f2f2f2;
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+        .calculator button.operation {
+            background-color: #ff8c00;
+            color: #fff;
+        }
+        .calculator button.equal {
+            background-color: #4caf50;
+            color: #fff;
+        }
+        .calculator button.home {
+            background-color: #007bff;
+            color: #fff;
+        }
+        .calculator button:active {
+            background-color: #ddd;
+        }
+        .double-width {
+            flex: 2;
+        }
+        /* 隐藏的输入框 */
+        #date-inputs {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        #date-inputs label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        #date-inputs input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        #date-inputs button {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            background-color: #4caf50;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #date-inputs button:hover {
+            background-color: #45a049;
+        }
+
+        /* 模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 600px;
+            max-height: 80%;
+            overflow-y: auto;
+        }
+        .modal-footer {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .modal-footer button {
+            padding: 10px 20px;
+            background-color: #4caf50;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .modal-footer button.home {
+            background-color: #007bff;
+        }
+        .modal-footer button:hover {
+            opacity: 0.8;
+        }
+        .graph-modal { z-index: 3; }
+        .graph-modal .modal-content {
+            width: min(1000px, 94vw);
+            max-width: 1000px;
+        }
+        #biorhythmCanvas {
+            display: block;
+            width: 100%;
+            height: 440px;
+            background: #fff;
+        }
+        .graph-heading {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+        .graph-heading h2 { margin: 0 0 12px; }
+        .graph-note { color: #666; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <textarea id="display" readonly></textarea>
+        <div class="button-row">
+            <button onclick="calculateFunction('sin')">sin</button>
+            <button onclick="calculateFunction('cos')">cos</button>
+            <button onclick="calculateFunction('tan')">tan</button>
+            <button onclick="calculateFunction('log')">log</button>
+            <button onclick="memoryStore()">MS</button>
+            <button onclick="memoryRecall()">MR</button>
+        </div>
+        <div class="button-row">
+            <button onclick="insertConstant('pi')">π</button>
+            <button onclick="insertConstant('e')">e</button>
+            <button onclick="calculateFibonacci()">Fib</button>
+            <button onclick="toggleBiorhythm()" id="biorhythmButton">生物节律</button>
+        </div>
+
+        <!-- 隐藏的日期输入框 -->
+        <div id="date-inputs">
+            <label for="birthdate">出生日期 (YYYYMMDD):</label>
+            <input type="text" id="birthdate" name="birthdate" value="" placeholder="YYYYMMDD" pattern="\d{8}" title="请输入8位数字，格式为YYYYMMDD">
+            <label for="targetdate">目标日期 (YYYYMMDD):</label>
+            <input type="text" id="targetdate" name="targetdate" placeholder="20240623" pattern="\d{8}" title="请输入8位数字，格式为YYYYMMDD">
+            <button onclick="calculateBiorhythm()">显示生物节律结果</button>
+        </div>
+
+        <div class="button-row">
+            <button onclick="clearDisplay()">C</button>
+            <button onclick="deleteLast()">←</button>
+            <button onclick="appendOperator('(')">(</button>
+            <button onclick="appendOperator(')')">)</button>
+            <button class="operation" onclick="appendOperator('/')">÷</button>
+        </div>
+        <div class="button-row">
+            <button onclick="appendNumber('7')">7</button>
+            <button onclick="appendNumber('8')">8</button>
+            <button onclick="appendNumber('9')">9</button>
+            <button class="operation" onclick="appendOperator('*')">×</button>
+            <button class="operation" onclick="appendOperator('%')">%</button>
+        </div>
+        <div class="button-row">
+            <button onclick="appendNumber('4')">4</button>
+            <button onclick="appendNumber('5')">5</button>
+            <button onclick="appendNumber('6')">6</button>
+            <button class="operation" onclick="appendOperator('-')">−</button>
+            <button onclick="calculateSquareRoot()">√</button>
+        </div>
+        <div class="button-row">
+            <button onclick="appendNumber('1')">1</button>
+            <button onclick="appendNumber('2')">2</button>
+            <button onclick="appendNumber('3')">3</button>
+            <button class="operation" onclick="appendOperator('+')">+</button>
+            <button onclick="appendDot()">.</button>
+        </div>
+        <div class="button-row">
+            <button onclick="appendNumber('0')" class="double-width">0</button>
+            <button class="equal" onclick="calculate()">=</button>
+        </div>
+        <div class="button-row">
+            <button onclick="calculateMinAttempts()">单事件概率最少次数</button>
+            <button class="home" onclick="goHome()">返回计算器</button>
+        </div>
+    </div>
+
+    <div id="graphModal" class="modal graph-modal" aria-label="生物节律曲线">
+        <div class="modal-content">
+            <div class="graph-heading">
+                <h2 id="graphTitle">生物节律曲线</h2>
+                <button type="button" onclick="closeGraph()" aria-label="关闭曲线">关闭</button>
+            </div>
+            <canvas id="biorhythmCanvas" role="img" aria-label="体力、情绪和智力三条生物节律曲线"></canvas>
+            <div class="graph-note">目标日期位于中间虚线处；曲线按 23、28、33 天周期绘制，仅供娱乐参考。</div>
+        </div>
+    </div>
+
+    <!-- 模态框用于显示生物节律结果 -->
+    <div id="biorhythmModal" class="modal">
+        <div class="modal-content">
+            <p id="biorhythmResult"></p>
+            <div class="modal-footer">
+                <button onclick="showGraph()">显示图像曲线</button>
+                <button class="home" onclick="goHome()">返回计算器</button>
+                <button onclick="closeModal()">返回计算器</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 切换显示/隐藏生物节律日期输入框
+        function toggleBiorhythm() {
+            var dateInputs = document.getElementById('date-inputs');
+            var biorhythmButton = document.getElementById('biorhythmButton');
+            if (dateInputs.style.display === 'none' || dateInputs.style.display === '') {
+                dateInputs.style.display = 'block';
+                // 设置默认目标日期为当前日期
+                var today = new Date();
+                var yyyy = today.getFullYear();
+                var mm = String(today.getMonth() + 1).padStart(2, '0'); // 补零
+                var dd = String(today.getDate()).padStart(2, '0'); // 补零
+                document.getElementById('targetdate').value = `${yyyy}${mm}${dd}`;
+                // 更改按钮文本
+                biorhythmButton.textContent = '关闭日期输入框';
+            } else {
+                dateInputs.style.display = 'none';
+                // 更改按钮文本
+                biorhythmButton.textContent = '生物节律';
+            }
+        }
+
+        // 关闭模态框
+        function closeModal() {
+            var modal = document.getElementById('biorhythmModal');
+            modal.style.display = 'none';
+        }
+
+        // 显示图像曲线并重定向到后端
+        function showGraph() {
+            drawBiorhythmGraph();
+        }
+
+        let currentGraphDates = null;
+
+        function closeGraph() {
+            document.getElementById('graphModal').style.display = 'none';
+        }
+
+        function parseGraphDate(value) {
+            if (!/^\d{8}$/.test(value)) return null;
+            const year = Number(value.slice(0, 4));
+            const month = Number(value.slice(4, 6));
+            const day = Number(value.slice(6, 8));
+            const date = new Date(0);
+            date.setUTCHours(0, 0, 0, 0);
+            date.setUTCFullYear(year, month - 1, day);
+            if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+            return date;
+        }
+
+        function drawBiorhythmGraph() {
+            const birthDate = parseGraphDate(document.getElementById('birthdate').value.trim());
+            const targetDate = parseGraphDate(document.getElementById('targetdate').value.trim());
+            if (!birthDate || !targetDate) {
+                alert('请输入有效日期，格式为 YYYYMMDD。');
+                return;
+            }
+            if (targetDate < birthDate) {
+                alert('目标日期不能早于出生日期。');
+                return;
+            }
+            currentGraphDates = { birthDate, targetDate };
+            document.getElementById('graphModal').style.display = 'flex';
+            renderBiorhythmGraph();
+        }
+
+        function renderBiorhythmGraph() {
+            if (!currentGraphDates) return;
+            const canvas = document.getElementById('biorhythmCanvas');
+            const rect = canvas.getBoundingClientRect();
+            if (!rect.width) return;
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = Math.round(rect.width * dpr);
+            canvas.height = Math.round(440 * dpr);
+            const ctx = canvas.getContext('2d');
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            const width = rect.width;
+            const height = 440;
+            const left = 58, right = 20, top = 36, bottom = 62;
+            const plotWidth = width - left - right;
+            const plotHeight = height - top - bottom;
+            const birthMs = currentGraphDates.birthDate.getTime();
+            const targetMs = currentGraphDates.targetDate.getTime();
+            const elapsed = Math.round((targetMs - birthMs) / 86400000);
+            const xForDay = day => left + ((day + 21) / 42) * plotWidth;
+            const yForValue = value => top + ((1 - value) / 2) * plotHeight;
+            const curves = [
+                { name: '体力指数（23天）', period: 23, color: '#1769d2' },
+                { name: '情绪指数（28天）', period: 28, color: '#159447' },
+                { name: '智力指数（33天）', period: 33, color: '#d43d3d' }
+            ];
+
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, width, height);
+            ctx.font = '13px Arial, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            for (let value = -1; value <= 1.001; value += 0.5) {
+                const y = yForValue(value);
+                ctx.beginPath();
+                ctx.strokeStyle = value === 0 ? '#888' : '#e5e7eb';
+                ctx.lineWidth = value === 0 ? 1.5 : 1;
+                ctx.moveTo(left, y);
+                ctx.lineTo(width - right, y);
+                ctx.stroke();
+                ctx.fillStyle = '#444';
+                ctx.fillText(value.toFixed(1), left - 9, y);
+            }
+
+            ctx.save();
+            ctx.setLineDash([5, 5]);
+            ctx.strokeStyle = '#555';
+            ctx.beginPath();
+            ctx.moveTo(xForDay(0), top);
+            ctx.lineTo(xForDay(0), height - bottom);
+            ctx.stroke();
+            ctx.restore();
+
+            for (const curve of curves) {
+                ctx.beginPath();
+                ctx.strokeStyle = curve.color;
+                ctx.lineWidth = 2.5;
+                for (let day = -21; day <= 21; day++) {
+                    const value = Math.sin(2 * Math.PI * (elapsed + day) / curve.period);
+                    const x = xForDay(day);
+                    const y = yForValue(value);
+                    if (day === -21) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            for (let day = -21; day <= 21; day += 7) {
+                const date = new Date(targetMs + day * 86400000);
+                const label = `${date.getUTCMonth() + 1}/${date.getUTCDate()}`;
+                const x = xForDay(day);
+                ctx.beginPath();
+                ctx.strokeStyle = '#999';
+                ctx.moveTo(x, height - bottom);
+                ctx.lineTo(x, height - bottom + 5);
+                ctx.stroke();
+                ctx.fillText(label, x, height - bottom + 9);
+            }
+
+            const legendY = 17;
+            let legendX = left;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            for (const curve of curves) {
+                ctx.fillStyle = curve.color;
+                ctx.fillRect(legendX, legendY - 5, 18, 3);
+                ctx.fillStyle = '#333';
+                ctx.fillText(curve.name, legendX + 23, legendY - 3);
+                legendX += 180;
+            }
+            const targetLabel = currentGraphDates.targetDate.toISOString().slice(0, 10);
+            document.getElementById('graphTitle').textContent = `生物节律曲线 · ${targetLabel}`;
+        }
+
+        window.addEventListener('resize', function() {
+            if (document.getElementById('graphModal').style.display === 'flex') renderBiorhythmGraph();
+        });
+
+        // 配置 math.js
+        math.config({
+            number: 'BigNumber',
+            precision: 55
+        });
+
+        let memoryValue = math.bignumber(0);
+
+        function formatResult(value) {
+            return math.format(value, { notation: 'fixed', precision: 55 });
+        }
+
+        function clearDisplay() {
+            document.getElementById('display').value = '';
+        }
+
+        function deleteLast() {
+            var display = document.getElementById('display');
+            display.value = display.value.slice(0, -1);
+        }
+
+        function appendNumber(number) {
+            var display = document.getElementById('display');
+            display.value += number;
+            autoResize(display);
+        }
+
+        function appendOperator(operator) {
+            var display = document.getElementById('display');
+            var lastChar = display.value[display.value.length - 1];
+
+            // 允许在数字和右括号后输入运算符
+            if (display.value !== '' && (!isNaN(lastChar) || lastChar === ')')) {
+                display.value += operator;
+            } 
+            // 允许直接输入左括号
+            else if (operator === '(') {
+                display.value += operator;
+            } 
+            // 如果当前输入框为空且用户输入的是负号（-），允许输入作为负数标记
+            else if (display.value === '' && operator === '-') {
+                display.value += operator;
+            }
+            autoResize(display);
+        }
+
+        function appendDot() {
+            var display = document.getElementById('display');
+            var currentValue = display.value;
+            
+            // 检查当前值是否为空或最后一个字符是否是运算符
+            if (currentValue === '' || isNaN(currentValue[currentValue.length - 1])) {
+                display.value += '0.';
+            } else {
+                // 允许在数字后面直接添加小数点
+                var lastNumber = currentValue.split(/[\+\-\*\/\÷\×]/).pop();
+                if (!lastNumber.includes('.')) {
+                    display.value += '.';
+                }
+            }
+            autoResize(display);
+        }
+
+        function calculate() {
+            var display = document.getElementById('display');
+            try {
+                // 直接使用 math.js 库的 evaluate 方法来解析和计算表达式
+                let result = math.evaluate(display.value.replace(/÷/g, '/').replace(/×/g, '*'));
+
+                // 格式化结果
+                display.value = formatResult(result);
+            } catch (e) {
+                display.value = '错误';
+                setTimeout(() => display.value = '', 1500);
+            }
+            autoResize(display);
+        }
+
+        function calculateSquareRoot() {
+            var display = document.getElementById('display');
+            try {
+                var value = math.bignumber(display.value);
+                var result = math.sqrt(value);
+                display.value = formatResult(result);
+            } catch (e) {
+                display.value = '错误';
+                setTimeout(() => display.value = '', 1500);
+            }
+            autoResize(display);
+        }
+
+        function goHome() {
+            document.getElementById('biorhythmModal').style.display = 'none';
+            closeGraph();
+            const calculator = document.querySelector('.calculator');
+            calculator.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            document.getElementById('display').focus({ preventScroll: true });
+        }
+
+        function calculateFunction(func) {
+            var display = document.getElementById('display');
+            var value = parseFloat(display.value);
+            var result;
+            switch(func) {
+                case 'sin':
+                    result = specialAnglesSin(value);
+                    break;
+                case 'cos':
+                    result = specialAnglesCos(value);
+                    break;
+                case 'tan':
+                    result = specialAnglesTan(value);
+                    break;
+                case 'log':
+                    if (value <= 0) {
+                        alert("对数函数的输入必须大于0");
+                        return;
+                    }
+                    result = Math.log10(value); 
+                    break;
+                default:
+                    return;
+            }
+            display.value = result.toString(); 
+            autoResize(display);
+        }
+
+        function specialAnglesSin(deg) {
+            var angle = deg % 360;
+            switch (angle) {
+                case 0: case 180: return 0;
+                case 30: case 150: return 0.5;
+                case 45: case 135: return Math.sqrt(2) / 2;
+                case 60: case 120: return Math.sqrt(3) / 2;
+                case 90: return 1;
+                case 210: case 330: return -0.5;
+                case 225: case 315: return -Math.sqrt(2) / 2;
+                case 240: case 300: return -Math.sqrt(3) / 2;
+                case 270: return -1;
+                default: return Math.sin(deg * (Math.PI / 180));
+            }
+        }
+
+        function specialAnglesCos(deg) {
+            var angle = deg % 360;
+            switch (angle) {
+                case 0: return 1;
+                case 30: case 330: return Math.sqrt(3) / 2;
+                case 45: case 315: return Math.sqrt(2) / 2;
+                case 60: case 300: return 0.5;
+                case 90: case 270: return 0;
+                case 120: case 240: return -0.5;
+                case 135: case 225: return -Math.sqrt(2) / 2;
+                case 150: case 210: return -Math.sqrt(3) / 2;
+                case 180: return -1;
+                default: return Math.cos(deg * (Math.PI / 180));
+            }
+        }
+
+        function specialAnglesTan(deg) {
+            var angle = deg % 180;
+            switch (angle) {
+                case 0: return 0;
+                case 30: return Math.sqrt(3) / 3;
+                case 45: return 1;
+                case 60: return Math.sqrt(3);
+                case 90: return '无穷大';
+                case 120: return -Math.sqrt(3);
+                case 135: return -1;
+                case 150: return -Math.sqrt(3) / 3;
+                default: 
+                    var tanValue = Math.tan(deg * (Math.PI / 180));
+                    if (Math.abs(tanValue) > 1e10) { // 处理接近90度的情况
+                        return '无穷大';
+                    }
+                    return tanValue;
+            }
+        }
+
+        function memoryStore() {
+            var display = document.getElementById('display');
+            try {
+                memoryValue = math.bignumber(display.value);
+            } catch (e) {
+                alert("无法存储当前显示的值。");
+            }
+        }
+
+        function memoryRecall() {
+            var display = document.getElementById('display');
+            display.value = formatResult(memoryValue);
+            autoResize(display);
+        }
+
+        function insertConstant(constant) {
+            var display = document.getElementById('display');
+            switch(constant) {
+                case 'pi':
+                    display.value += math.pi; 
+                    break;
+                case 'e':
+                    display.value += math.e; 
+                    break;
+                default:
+                    break;
+            }
+            autoResize(display);
+        }
+
+        function calculateFibonacci() {
+            var display = document.getElementById('display');
+            var n = parseInt(display.value);
+            if (isNaN(n) || n < 0 || n > 1e8) {
+                display.value = '错误';
+                setTimeout(() => display.value = '', 1500);
+                return;
+            }
+            display.value = fibonacci(n).toString(10); 
+            autoResize(display);
+        }
+
+        function fibonacci(n) {
+            if (n === 0) return math.bignumber(0);
+            if (n === 1) return math.bignumber(1);
+            let F = [[math.bignumber(1), math.bignumber(1)], [math.bignumber(1), math.bignumber(0)]];
+            let result = power(F, n - 1);
+            return result[0][0];
+        }
+
+        function multiplyMatrices(A, B) {
+            return [
+                [
+                    math.add(math.multiply(A[0][0], B[0][0]), math.multiply(A[0][1], B[1][0])),
+                    math.add(math.multiply(A[0][0], B[0][1]), math.multiply(A[0][1], B[1][1]))
+                ],
+                [
+                    math.add(math.multiply(A[1][0], B[0][0]), math.multiply(A[1][1], B[1][0])),
+                    math.add(math.multiply(A[1][0], B[0][1]), math.multiply(A[1][1], B[1][1]))
+                ]
+            ];
+        }
+
+        function power(matrix, n) {
+            if (n === 0) {
+                return [[math.bignumber(1), math.bignumber(0)], [math.bignumber(0), math.bignumber(1)]];
+            }
+            if (n === 1) {
+                return matrix;
+            }
+            let halfPower = power(matrix, Math.floor(n / 2));
+            let fullPower = multiplyMatrices(halfPower, halfPower);
+            if (n % 2 !== 0) {
+                fullPower = multiplyMatrices(fullPower, matrix);
+            }
+            return fullPower;
+        }
+
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = (textarea.scrollHeight) + 'px';
+        }
+
+        // 生物节律计算
+        function calculateBiorhythm() {
+            var birthDate = document.getElementById('birthdate').value;
+            var targetDateInput = document.getElementById('targetdate').value;
+
+            // 验证日期格式
+            var datePattern = /^\d{8}$/;
+            if (!datePattern.test(birthDate)) {
+                alert("请输入有效的出生日期，格式为YYYYMMDD");
+                return;
+            }
+            if (!datePattern.test(targetDateInput)) {
+                alert("请输入有效的目标计算日期，格式为YYYYMMDD");
+                return;
+            }
+
+            // 解析出生日期
+            var year = parseInt(birthDate.substring(0, 4));
+            var month = parseInt(birthDate.substring(4, 6)) - 1; // JavaScript中的月份是从0开始的
+            var day = parseInt(birthDate.substring(6, 8));
+            var birthTime = new Date(year, month, day);
+
+            // 解析目标日期
+            var targetYear = parseInt(targetDateInput.substring(0, 4));
+            var targetMonth = parseInt(targetDateInput.substring(4, 6)) - 1;
+            var targetDay = parseInt(targetDateInput.substring(6, 8));
+            var targetTime = new Date(targetYear, targetMonth, targetDay);
+
+            // 检查目标日期是否早于出生日期
+            if (targetTime < birthTime) {
+                alert("目标日期不能早于出生日期");
+                return;
+            }
+
+            // 计算日期差
+            var diffTime = targetTime - birthTime;
+            var diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+            // 计算生物节律指数
+            var physicalIndex = diffDays % 23;
+            var emotionalIndex = diffDays % 28;
+            var intellectualIndex = diffDays % 33;
+
+            var physicalPhase = Math.sin(2 * Math.PI * physicalIndex / 23);
+            var emotionalPhase = Math.sin(2 * Math.PI * emotionalIndex / 28);
+            var intellectualPhase = Math.sin(2 * Math.PI * intellectualIndex / 33);
+
+            function getBiorhythmStatus(phase) {
+                if (phase > 0.5) {
+                    return "高峰期";
+                } else if (phase < -0.5) {
+                    return "低谷期";
+                } else {
+                    return "转折期";
+                }
+            }
+
+            function findPreviousPeakDate(birthTime, period1, period2, period3, peak = true) {
+                var currentDiffDays = Math.floor((targetTime - birthTime) / (1000 * 60 * 60 * 24));
+                for (let i = 1; i <= 365; i++) {
+                    let day = currentDiffDays - i;
+                    let phase1 = Math.sin(2 * Math.PI * (day % period1) / period1);
+                    let phase2 = Math.sin(2 * Math.PI * (day % period2) / period2);
+                    let phase3 = Math.sin(2 * Math.PI * (day % period3) / period3);
+                    if (peak) {
+                        if (phase1 > 0.5 && phase2 > 0.5 && phase3 > 0.5) {
+                            let previousDate = new Date(targetTime);
+                            previousDate.setDate(targetTime.getDate() - i);
+                            return previousDate;
+                        }
+                    } else {
+                        if (phase1 < -0.5 && phase2 < -0.5 && phase3 < -0.5) {
+                            let previousDate = new Date(targetTime);
+                            previousDate.setDate(targetTime.getDate() - i);
+                            return previousDate;
+                        }
+                    }
+                }
+                return null;
+            }
+
+            function findNextPeakDate(birthTime, period1, period2, period3, peak = true) {
+                var currentDiffDays = Math.floor((targetTime - birthTime) / (1000 * 60 * 60 * 24));
+                for (let i = 1; i <= 365; i++) {
+                    let day = currentDiffDays + i;
+                    let phase1 = Math.sin(2 * Math.PI * (day % period1) / period1);
+                    let phase2 = Math.sin(2 * Math.PI * (day % period2) / period2);
+                    let phase3 = Math.sin(2 * Math.PI * (day % period3) / period3);
+                    if (peak) {
+                        if (phase1 > 0.5 && phase2 > 0.5 && phase3 > 0.5) {
+                            let nextDate = new Date(targetTime);
+                            nextDate.setDate(targetTime.getDate() + i);
+                            return nextDate;
+                        }
+                    } else {
+                        if (phase1 < -0.5 && phase2 < -0.5 && phase3 < -0.5) {
+                            let nextDate = new Date(targetTime);
+                            nextDate.setDate(targetTime.getDate() + i);
+                            return nextDate;
+                        }
+                    }
+                }
+                return null;
+            }
+
+            var physicalStatus = getBiorhythmStatus(physicalPhase);
+            var emotionalStatus = getBiorhythmStatus(emotionalPhase);
+            var intellectualStatus = getBiorhythmStatus(intellectualPhase);
+
+            var lastHighPeakDate = findPreviousPeakDate(birthTime, 23, 28, 33, true);
+            var lastLowPeakDate = findPreviousPeakDate(birthTime, 23, 28, 33, false);
+
+            var nextHighPeakDate = findNextPeakDate(birthTime, 23, 28, 33, true);
+            var nextLowPeakDate = findNextPeakDate(birthTime, 23, 28, 33, false);
+
+            function formatDate(date) {
+                return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+            }
+
+            var resultText = 
+                "1. 您所查询日期的生物节律情况：\n" +
+                "体力指数是 " + physicalIndex + " (" + physicalStatus + ")；\n" +
+                "情绪指数是 " + emotionalIndex + " (" + emotionalStatus + ")；\n" +
+                "智力指数是 " + intellectualIndex + " (" + intellectualStatus + ")\n\n" +
+                "2. 您上次体力、情绪、智力三者均处于高峰期的日期是：\n" +
+                (lastHighPeakDate ? formatDate(lastHighPeakDate) : "未找到") + "；\n" +
+                "均处于低谷期的日期是：\n" +
+                (lastLowPeakDate ? formatDate(lastLowPeakDate) : "未找到") + "\n\n" +
+                "3. 您下次体力、情绪、智力三者均处于高峰期的日期是：\n" +
+                (nextHighPeakDate ? formatDate(nextHighPeakDate) : "未找到") + "；\n" +
+                "均处于低谷期的日期是：\n" +
+                (nextLowPeakDate ? formatDate(nextLowPeakDate) : "未找到") + "\n\n" +
+                "4. 提醒：每人的生物节律不尽相同，查询结果仅作娱乐参考";
+
+            document.getElementById('biorhythmResult').innerText = resultText;
+
+            // 显示模态框
+            var modal = document.getElementById('biorhythmModal');
+            modal.style.display = 'flex';
+        }
+
+        // 关闭模态框
+        function closeModal() {
+            var modal = document.getElementById('biorhythmModal');
+            modal.style.display = 'none';
+        }
+
+        // 显示模态框内容并重定向到后端图像生成
+        function showGraph() {
+            drawBiorhythmGraph();
+        }
+
+        // 数学原理提示和最少尝试次数计算
+        function calculateMinAttempts() {
+            alert("数学原理：\n" +
+                "设单次事件发生的概率为 p，未发生的概率为 q = 1 - p。\n" +
+                "进行 n 次独立尝试后，事件每次都未发生的概率为 q^n。\n" +
+                "我们希望事件至少发生一次的置信度为 target_confidence（默认值设99.9%）。\n" +
+                "求出最少的尝试次数 n，使得事件每次都未发生的概率小于 1 - target_confidence。\n" +
+                "公式：\n" +
+                "q^n < 1 - target_confidence\n" +
+                "取对数得：\n" +
+                "n > log(1 - target_confidence) / log(q)\n" +
+                "因为 n 必须是整数，所以取上限。\n");
+
+            var probability = parseFloat(prompt("请输入单事件发生的概率（百分比或小数）："));
+            var target_confidence = parseFloat(prompt("请输入目标置信度（默认为99.9%）：") || 0.999);
+
+            if (isNaN(probability) || isNaN(target_confidence)) {
+                alert("请输入有效的数字。");
+                return;
+            }
+
+            if (probability > 1) {
+                probability /= 100;
+            }
+
+            var min_attempts = Math.ceil(Math.log(1 - target_confidence) / Math.log(1 - probability));
+
+            alert(`为了确保事件发生的概率至少为 ${(target_confidence * 100).toFixed(2)}%，最少需要尝试 ${min_attempts} 次。`);
+        }
+
+        var display = document.getElementById('display');  
+          
+        display.addEventListener('keydown', function(event) {
+            switch (event.key) {
+                case 'Escape':
+                    clearDisplay(); 
+                    event.preventDefault(); 
+                    break;
+                case 'Enter': 
+                    calculate(); 
+                    event.preventDefault(); 
+                    break;
+                case 'Backspace': 
+                case 'Delete': 
+                    deleteLast(); 
+                    autoResize(display); 
+                    event.preventDefault(); 
+                    break;
+                case '+': 
+                case '-': 
+                case '*': 
+                case '/': 
+                    appendOperator(event.key); 
+                    autoResize(display); 
+                    event.preventDefault(); 
+                    break;
+                case '(': 
+                case ')': 
+                    appendOperator(event.key); 
+                    autoResize(display); 
+                    event.preventDefault(); 
+                    break;
+                case '0': 
+                case '1': 
+                case '2': 
+                case '3': 
+                case '4': 
+                case '5': 
+                case '6': 
+                case '7': 
+                case '8': 
+                case '9': 
+                    appendNumber(event.key); 
+                    autoResize(display); 
+                    break;
+                case '.': 
+                    appendDot(); 
+                    autoResize(display); 
+                    event.preventDefault(); 
+                    break;
+                default:
+                    break;
+            }
+        });
+
+        // 点击空白区域关闭模态框
+        window.onclick = function(event) {
+            var modal = document.getElementById('biorhythmModal');
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+            if (event.target == document.getElementById('graphModal')) {
+                closeGraph();
+            }
+        }
+    </script>
+</body>
+</html>
