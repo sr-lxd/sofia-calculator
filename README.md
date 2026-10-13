@@ -1,5 +1,11 @@
 # Sofia计算器
 
+<!-- en-intro -->
+**Sofia Calculator** — a single-page browser calculator with arithmetic, big Fibonacci, biorhythm curves and probability helpers. No server, no database.
+<!-- /en-intro -->
+
+---
+
 一个直接在浏览器中运行的单页计算器。页面把常用计算、斐波那契数列、生物节律曲线和概率尝试次数计算放在一起，无需安装后端服务或数据库。
 
 ## 功能
